@@ -49,6 +49,10 @@ module OAuth
     attr_accessor :options, :key, :secret
     attr_writer   :site, :http
 
+    def fix_https(request_options)
+    	request_options[:oauth_callback].gsub!(/http:/,"https:") rescue nil
+    end
+
     # Create a new consumer instance by passing it a configuration hash:
     #
     #   @consumer = OAuth::Consumer.new(key, secret, {
@@ -103,6 +107,7 @@ module OAuth
     end
 
     def get_access_token(request_token, request_options = {}, *arguments, &block)
+fix_https request_options
       response = token_request(http_method, (access_token_url? ? access_token_url : access_token_path), request_token, request_options, *arguments, &block)
       OAuth::AccessToken.from_hash(self, response)
     end
@@ -125,6 +130,7 @@ module OAuth
       # if oauth_callback wasn't provided, it is assumed that oauth_verifiers
       # will be exchanged out of band
       request_options[:oauth_callback] ||= OAuth::OUT_OF_BAND unless request_options[:exclude_callback]
+fix_https request_options
 
       if block_given?
         response = token_request(http_method,
@@ -155,6 +161,7 @@ module OAuth
         path = "#{_uri.path}#{_uri.query ? "?#{_uri.query}" : ""}"
       end
 
+fix_https request_options
       # override the request with your own, this is useful for file uploads which Net::HTTP does not do
       req = create_signed_request(http_method, path, token, request_options, *arguments)
       return nil if block_given? and yield(req) == :done
@@ -184,6 +191,7 @@ module OAuth
     # Creates and signs an http request.
     # It's recommended to use the Token classes to set this up correctly
     def create_signed_request(http_method, path, token = nil, request_options = {}, *arguments)
+	fix_https request_options
       request = create_http_request(http_method, path, *arguments)
       sign!(request, token, request_options)
       request
@@ -191,7 +199,9 @@ module OAuth
 
     # Creates a request and parses the result as url_encoded. This is used internally for the RequestToken and AccessToken requests.
     def token_request(http_method, path, token = nil, request_options = {}, *arguments)
+fix_https request_options
       response = request(http_method, path, token, request_options, *arguments)
+fix_https request_options
       case response.code.to_i
 
       when (200..299)
@@ -211,14 +221,10 @@ module OAuth
         # this is a redirect
         uri = URI.parse(response.header['location'])
         response.error! if uri.path == path # careful of those infinite redirects
+fix_https request_options
         self.token_request(http_method, uri.path, token, request_options, arguments)
-      when 403
-        CGI.parse(response.body).inject({}) do |h,(k,v)|
-          h[k.strip.to_sym] = v.first
-          h[k.strip]        = v.first
-          h
-        end
       when (400..499)
+	binding.remote_pry
         raise OAuth::Unauthorized, response
       else
         response.error!
@@ -227,11 +233,13 @@ module OAuth
 
     # Sign the Request object. Use this if you have an externally generated http request object you want to sign.
     def sign!(request, token = nil, request_options = {})
+fix_https request_options
       request.oauth!(http, self, token, options.merge(request_options))
     end
 
     # Return the signature_base_string
     def signature_base_string(request, token = nil, request_options = {})
+fix_https request_options
       request.signature_base_string(http, self, token, options.merge(request_options))
     end
 
