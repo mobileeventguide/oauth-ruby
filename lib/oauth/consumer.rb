@@ -212,6 +212,8 @@ module OAuth
         uri = URI.parse(response.header['location'])
         response.error! if uri.path == path # careful of those infinite redirects
         self.token_request(http_method, uri.path, token, request_options, arguments)
+      when (403)
+        response.error!
       when (400..499)
         raise OAuth::Unauthorized, response
       else
