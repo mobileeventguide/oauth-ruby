@@ -224,7 +224,6 @@ fix_https request_options
 fix_https request_options
         self.token_request(http_method, uri.path, token, request_options, arguments)
       when (400..499)
-	binding.remote_pry
         raise OAuth::Unauthorized, response
       else
         response.error!
